@@ -20,13 +20,17 @@
         <div class="flex items-center gap-3">
             <span class="text-3xl">🍳</span>
             <div>
-                <h1 id="storeNameDisplay" class="text-xl font-bold text-orange-400">กำลังเชื่อมต่อร้าน...</h1>
-                <p class="text-xs text-slate-400">จอแสดงออเดอร์ห้องครัว (Kitchen Display System)</p>
+                <h1 id="storeNameDisplay" class="text-xl font-bold text-orange-400">จอครัวห้องอาหาร</h1>
+                <p id="currentStoreSubText" class="text-xs text-slate-400">กำลังเลือก ฐานข้อมูลร้านค้า</p>
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <button onclick="loadKitchenOrders()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-orange-400 border border-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
-                <span>🔄</span> รีเฟรช
+            <!-- ปุ่มเปลี่ยนร้าน -->
+            <button onclick="openStoreSelectorModal()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-orange-400 border border-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
+                <span>🔄</span> เปลี่ยนร้าน
+            </button>
+            <button onclick="loadKitchenOrders()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-orange-400 border border-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
+                <span>⚡</span> รีเฟรช
             </button>
             <div class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> ออนไลน์ (Live)
@@ -34,49 +38,104 @@
         </div>
     </header>
 
-    <!-- พื้นที่แสดงการ์ดออเดอร์ (Kanban Board) -->
+    <!-- พื้นที่แสดงการ์ดออเดอร์ -->
     <main class="flex-1 overflow-y-auto p-6 no-scrollbar">
         <div id="kitchenOrderCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 content-start">
             <div class="col-span-full text-center text-slate-500 py-28 font-bold text-base">
-                ⏳ กำลังโหลดรายการอาหารเข้าครัว...
+                ⏳ กรุณาเลือกสาขาร้านค้าด้านบนเพื่อเริ่มแสดงออเดอร์...
             </div>
         </div>
     </main>
 
-    <script>
-        // 📌 ใส่ลิงก์ Google Apps Script Web App (ลิงก์ /exec ของคุณ)
-        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwVwzvMQA7vNWfh5RHTtNhSUrvFVBMKxIjMKmKm7ylD5wIGPvO8sj_lo1feUGAXvz3D/exec";
+    <!-- Modal: เลือกสาขาร้านค้าจากข้อมูลจริง Store_Hub -->
+    <div id="storeSelectorModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-md p-6 md:p-8 shadow-2xl relative flex flex-col">
+            <h3 class="text-xl font-bold text-orange-400 mb-2 flex items-center gap-2">
+                <span>🏪</span> เลือกสาขาร้านค้า
+            </h3>
+            <p class="text-xs text-slate-400 mb-5">ระบบดึงข้อมูลรายชื่อร้านค้าจริงจากศูนย์กลางโดยอัตโนมัติ</p>
 
-        // ดึง storeId จาก URL (เช่น kitchen-famepos.vercel.app/?storeId=YOUR_STORE_ID)
-        const urlParams = new URLSearchParams(window.location.search);
-        const storeId = urlParams.get('storeId');
+            <div id="storeListContainer" class="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar mb-4">
+                <div class="text-center text-slate-500 py-8 font-bold text-sm">กำลังดึงข้อมูลรายชื่อร้าน...</div>
+            </div>
+
+            <button id="closeModalBtn" onclick="document.getElementById('storeSelectorModal').classList.add('hidden')" class="hidden w-full py-3 bg-slate-800 text-slate-300 font-bold rounded-2xl hover:bg-slate-700 transition text-sm">
+                ปิดหน้าต่าง
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwVwzvMQA7vNWfh5RHTtNhSUrvFVBMKxIjMKmKm7ylD5wIGPvO8sj_lo1feUGAXvz3D/exec";
+        let activeStoreId = "";
 
         window.onload = function() {
-            if (!storeId) {
-                document.body.innerHTML = `
-                    <div class="flex h-screen items-center justify-center font-bold text-red-400 text-center p-6 bg-slate-950">
-                        ❌ ไม่พบรหัสร้านค้า (storeId) ในลิงก์<br>กรุณาตรวจสอบ URL ให้ถูกต้อง
-                    </div>`;
-                return;
-            }
-            
-            // โหลดข้อมูลร้านและออเดอร์ทันที
+            // เปิดหน้าจอมา ให้เด้งหน้าต่างดึงรายชื่อร้านจาก Store_Hub จริงทันที
+            openStoreSelectorModal();
+        };
+
+        function openStoreSelectorModal() {
+            let modal = document.getElementById('storeSelectorModal');
+            let container = document.getElementById('storeListContainer');
+            modal.classList.remove('hidden');
+            container.innerHTML = `<div class="text-center text-slate-500 py-8 font-bold text-sm">กำลังเชื่อมต่อฐานข้อมูล...</div>`;
+
+            let targetUrl = `${GAS_API_URL}?action=getAllStoresFromHub`;
+
+            fetch(targetUrl)
+                .then(res => res.json())
+                .then(res => {
+                    if (res.status === "Success" && res.stores) {
+                        let stores = res.stores;
+                        if (stores.length === 0) {
+                            container.innerHTML = `<div class="text-center text-slate-500 py-8 text-sm">ไม่พบรายชื่อร้านค้าในระบบ</div>`;
+                            return;
+                        }
+
+                        container.innerHTML = stores.map(store => `
+                            <div onclick="selectStore('${store.spreadsheetId}', '${store.storeName}')" class="bg-slate-800 hover:bg-orange-600/20 border border-slate-700/80 hover:border-orange-500 p-4 rounded-2xl cursor-pointer transition flex justify-between items-center group">
+                                <div>
+                                    <div class="font-bold text-white text-base group-hover:text-orange-400 transition">${store.storeName}</div>
+                                    <div class="text-[10px] text-slate-400 font-mono mt-0.5">ID: ${store.spreadsheetId}</div>
+                                </div>
+                                <span class="text-orange-400 font-bold text-sm">เลือกสาขานี้ →</span>
+                            </div>
+                        `).join('');
+
+                        // ถ้ามีร้านในระบบ ให้แสดงปุ่มปิด
+                        document.getElementById('closeModalBtn').classList.remove('hidden');
+                    } else {
+                        container.innerHTML = `<div class="text-center text-red-400 py-8 text-sm">ไม่สามารถโหลดรายชื่อร้านได้</div>`;
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    container.innerHTML = `<div class="text-center text-red-400 py-8 text-sm">เกิดข้อผิดพลาดในการเชื่อมต่อ</div>`;
+                });
+        }
+
+        function selectStore(sId, sName) {
+            activeStoreId = sId;
+            document.getElementById('storeNameDisplay').innerText = sName;
+            document.getElementById('currentStoreSubText').innerText = `สาขา: ${sName}`;
+            document.getElementById('storeSelectorModal').classList.add('hidden');
+
+            // เริ่มโหลดออเดอร์ของร้านนี้
             loadKitchenOrders();
 
             // ตั้งเวลารีเฟรชออเดอร์อัตโนมัติทุกๆ 10 วินาที
-            setInterval(loadKitchenOrders, 10000);
-        };
+            if (window.kitchenTimer) clearInterval(window.kitchenTimer);
+            window.kitchenTimer = setInterval(loadKitchenOrders, 10000);
+        }
 
         function loadKitchenOrders() {
-            let targetUrl = `${GAS_API_URL}?action=getKitchenOrdersBackend&storeId=${storeId}`;
+            if (!activeStoreId) return;
+            let targetUrl = `${GAS_API_URL}?action=getKitchenOrdersBackend&storeId=${activeStoreId}`;
             
             fetch(targetUrl)
                 .then(res => res.json())
                 .then(res => {
                     if (res.status === "Success") {
-                        if (res.storeName) {
-                            document.getElementById('storeNameDisplay').innerText = res.storeName;
-                        }
                         renderKitchenBoard(res.orders || []);
                     }
                 })
@@ -87,7 +146,6 @@
             let container = document.getElementById('kitchenOrderCardsContainer');
             if (!container) return;
 
-            // กรองเฉพาะออเดอร์ที่ยังไม่เสร็จ
             let activeOrders = orders.filter(o => !o.status || o.status !== 'เสร็จสิ้น');
 
             if (activeOrders.length === 0) {
@@ -105,7 +163,6 @@
                 return `
                     <div class="bg-slate-900 border-2 border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all">
                         <div class="absolute top-0 left-0 right-0 h-2 bg-orange-500"></div>
-                        
                         <div>
                             <div class="flex justify-between items-start mb-3 border-b border-slate-800 pb-3">
                                 <div>
@@ -117,8 +174,6 @@
                                     <div class="text-xs font-bold text-slate-300">${order.timestamp || '-'}</div>
                                 </div>
                             </div>
-
-                            <!-- รายการอาหาร -->
                             <div class="space-y-2 my-3">
                                 ${itemsList.map(item => `
                                     <div class="flex justify-between items-center bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
@@ -128,7 +183,6 @@
                                 `).join('')}
                             </div>
                         </div>
-
                         <div class="pt-3 border-t border-slate-800 mt-2">
                             <button onclick="markOrderCompleted('${order.orderId}')" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-xs shadow-lg shadow-emerald-900/20 transition active:scale-95 flex items-center justify-center gap-2">
                                 <span>✅</span> 
@@ -149,7 +203,7 @@
 
             let payload = {
                 action: "updateOrderStatusBackend",
-                args: [storeId, orderId, 'เสร็จสิ้น']
+                args: [activeStoreId, orderId, 'เสร็จสิ้น']
             };
 
             fetch(GAS_API_URL, {

@@ -1,230 +1,464 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fame POS - จอแสดงผลในครัว (Kitchen Display)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <style>
-        body { font-family: 'Kanit', sans-serif; background-color: #0f172a; color: #f8fafc; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FamePOS Kitchen</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <link rel="icon" type="image/png" href="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="KDS FamePOS">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap');
+    body { font-family: 'Kanit', sans-serif; background-color: var(--bg-app); color: #4e0606; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #fdecec; }
+    ::-webkit-scrollbar-thumb { background: #fad1d1; border-radius: 10px; }
+
+    .item-done {
+        text-decoration: line-through;
+        opacity: 0.5;
+        background-color: #fff1f2;
+    }
+    
+    /* 🎨 ปรับโทนสี FamePOS Kitchen ให้เป็นอันหนึ่งอันเดียวกัน */
+    :root {
+        --primary: #db2777; /* ชมพูเข้ม FamePOS */
+        --bg-app: #fdecec;  /* พื้นหลังชมพูอ่อน */
+        --border-app: #fad1d1;
+    }
+
+    /* ปุ่มสถานะตามสีแอป */
+    .btn-new { background-color: #f43f5e; color: white; }      /* แดงชมพู (ออเดอร์ใหม่) */
+    .btn-cooking { background-color: #d97706; color: white; }  /* ส้มทอง (กำลังทำ) */
+    .btn-done { background-color: #059669; color: white; }     /* เขียว (เสร็จแล้ว) */
+
+    .filter-tab {
+        transition: all 0.2s;
+    }
+    .filter-tab.active-tab {
+        border: 3px solid #db2777 !important; /* สีชมพู FamePOS */
+    }
+  </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
+  
+  <div id="toastContainer" class="fixed top-5 right-5 z-[10000] flex flex-col gap-3 pointer-events-none w-80"></div>
 
-    <!-- Header ครัว -->
-    <header class="bg-slate-900 border-b border-slate-800 p-4 shrink-0 flex justify-between items-center shadow-lg z-10">
-        <div class="flex items-center gap-3">
-            <span class="text-3xl">🍳</span>
-            <div>
-                <h1 id="storeNameDisplay" class="text-xl font-bold text-orange-400">จอครัวห้องอาหาร</h1>
-                <p id="currentStoreSubText" class="text-xs text-slate-400">กำลังเลือก ฐานข้อมูลร้านค้า</p>
-            </div>
+  <!-- ส่วน Header -->
+  <header class="bg-white border-b border-pink-100 p-4 flex justify-between items-center shrink-0 shadow-sm z-10">
+    <div class="flex items-center gap-3">
+      <img src="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png" alt="Kitchen Logo" class="w-12 h-12 object-contain drop-shadow-sm">
+      <div>
+        <h1 class="text-xl font-bold text-pink-800 tracking-wide">FamePOS จอห้องครัว</h1>
+        <p class="text-xs text-pink-500/80">ระบบอัปเดตคิวและรายการอาหารอัตโนมัติ Real-time</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="text-right">
+        <div id="clockTime" class="text-xl font-black text-pink-600 tracking-wider">00:00:00</div>
+      </div>
+      <button onclick="fetchKitchenOrders()" class="bg-pink-50 hover:bg-pink-100 border border-pink-200 px-4 py-2 rounded-xl text-sm font-bold text-pink-700 transition flex items-center gap-1.5 shadow-sm active:scale-95 transform">
+        🔄 รีเฟรชคิวอาหาร
+      </button>
+    </div>
+  </header>
+
+<!-- แถบสรุปสถานะออเดอร์ -->
+<div class="bg-white border-b border-pink-100 px-6 py-3 shrink-0 flex justify-between items-center shadow-sm">
+    <div class="flex gap-4 w-full">
+        <div id="tab-Pending" onclick="setFilter('Pending')" class="filter-tab flex-1 bg-red-50 border-2 border-red-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-red-100 transition">
+            <div class="text-xs font-bold text-red-400">ออเดอร์ใหม่</div>
+            <div id="countNew" class="text-2xl font-black text-red-600">0</div>
         </div>
-        <div class="flex items-center gap-3">
-            <!-- ปุ่มเปลี่ยนร้าน -->
-            <button onclick="openStoreSelectorModal()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-orange-400 border border-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
-                <span>🔄</span> เปลี่ยนร้าน
-            </button>
-            <button onclick="loadKitchenOrders()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-orange-400 border border-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
-                <span>⚡</span> รีเฟรช
-            </button>
-            <div class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> ออนไลน์ (Live)
-            </div>
+        <div id="tab-รับออเดอร์แล้ว" onclick="setFilter('รับออเดอร์แล้ว')" class="filter-tab flex-1 bg-amber-50 border-2 border-amber-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-amber-100 transition">
+            <div class="text-xs font-bold text-amber-500">รับออเดอร์แล้ว</div>
+            <div id="countAccepted" class="text-2xl font-black text-amber-600">0</div>
         </div>
-    </header>
-
-    <!-- พื้นที่แสดงการ์ดออเดอร์ -->
-    <main class="flex-1 overflow-y-auto p-6 no-scrollbar">
-        <div id="kitchenOrderCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 content-start">
-            <div class="col-span-full text-center text-slate-500 py-28 font-bold text-base">
-                ⏳ กรุณาเลือกสาขาร้านค้าด้านบนเพื่อเริ่มแสดงออเดอร์...
-            </div>
+        <div id="tab-กำลังทำ" onclick="setFilter('กำลังทำ')" class="filter-tab flex-1 bg-purple-50 border-2 border-purple-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-purple-100 transition">
+            <div class="text-xs font-bold text-purple-500">กำลังทำ</div>
+            <div id="countCooking" class="text-2xl font-black text-purple-600">0</div>
         </div>
-    </main>
-
-    <!-- Modal: เลือกสาขาร้านค้าจากข้อมูลจริง Store_Hub -->
-    <div id="storeSelectorModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-md p-6 md:p-8 shadow-2xl relative flex flex-col">
-            <h3 class="text-xl font-bold text-orange-400 mb-2 flex items-center gap-2">
-                <span>🏪</span> เลือกสาขาร้านค้า
-            </h3>
-            <p class="text-xs text-slate-400 mb-5">ระบบดึงข้อมูลรายชื่อร้านค้าจริงจากศูนย์กลางโดยอัตโนมัติ</p>
-
-            <div id="storeListContainer" class="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar mb-4">
-                <div class="text-center text-slate-500 py-8 font-bold text-sm">กำลังดึงข้อมูลรายชื่อร้าน...</div>
-            </div>
-
-            <button id="closeModalBtn" onclick="document.getElementById('storeSelectorModal').classList.add('hidden')" class="hidden w-full py-3 bg-slate-800 text-slate-300 font-bold rounded-2xl hover:bg-slate-700 transition text-sm">
-                ปิดหน้าต่าง
-            </button>
+        <div id="tab-All" onclick="setFilter('All')" class="filter-tab flex-1 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-emerald-100 transition">
+            <div class="text-xs font-bold text-emerald-500">รวมทั้งหมด</div>
+            <div id="countTotal" class="text-2xl font-black text-emerald-700">0</div>
         </div>
     </div>
+</div>
 
-    <script>
-        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwVwzvMQA7vNWfh5RHTtNhSUrvFVBMKxIjMKmKm7ylD5wIGPvO8sj_lo1feUGAXvz3D/exec";
-        let activeStoreId = "";
+  <main id="kitchenGrid" class="flex-1 p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 overflow-y-auto content-start">
+    <div class="col-span-full h-96 flex flex-col items-center justify-center text-pink-400 font-bold gap-3">
+      <span class="text-5xl animate-spin">⏳</span>
+      <span class="text-lg">กำลังดึงคิวใบสั่งอาหารจากระบบหลังบ้าน...</span>
+    </div>
+  </main>
 
-        window.onload = function() {
-            // เปิดหน้าจอมา ให้เด้งหน้าต่างดึงรายชื่อร้านจาก Store_Hub จริงทันที
-            openStoreSelectorModal();
-        };
+  <script>
+    // 📌 ใส่ลิงก์ Google Apps Script Web App ของคุณที่นี่
+    const API_URL = "https://script.google.com/macros/s/AKfycbwVwzvMQA7vNWfh5RHTtNhSUrvFVBMKxIjMKmKm7ylD5wIGPvO8sj_lo1feUGAXvz3D/exec";
 
-        function openStoreSelectorModal() {
-            let modal = document.getElementById('storeSelectorModal');
-            let container = document.getElementById('storeListContainer');
-            modal.classList.remove('hidden');
-            container.innerHTML = `<div class="text-center text-slate-500 py-8 font-bold text-sm">กำลังเชื่อมต่อฐานข้อมูล...</div>`;
+    // 🌟 ระบบตรวจจับ Store ID อัจฉริยะ 🌟
+    function getStoreId() {
+        // 1. ลองดึงจาก URL ก่อน
+        const urlParams = new URLSearchParams(window.location.search);
+        let sId = urlParams.get('storeId');
+        
+        // 2. ถ้าไม่มี ลองดึงจาก localStorage (ของแอปครัวเดิม)
+        if (!sId) sId = localStorage.getItem('CURRENT_STORE_ID');
 
-            let targetUrl = `${GAS_API_URL}?action=getAllStoresFromHub`;
+        // 3. 💥 ถ้ายังไม่มีอีก แสดงว่าเปิดบนเครื่องเดียวกับแอป POS หลัก ให้ไปดึงจาก pos_user มาใช้อัตโนมัติ!
+        if (!sId) {
+            let posUser = JSON.parse(localStorage.getItem('pos_user') || localStorage.getItem('fame_current_user') || 'null');
+            if (posUser && posUser.spreadsheetId) sId = posUser.spreadsheetId;
+        }
 
-            fetch(targetUrl)
-                .then(res => res.json())
-                .then(res => {
-                    if (res.status === "Success" && res.stores) {
-                        let stores = res.stores;
-                        if (stores.length === 0) {
-                            container.innerHTML = `<div class="text-center text-slate-500 py-8 text-sm">ไม่พบรายชื่อร้านค้าในระบบ</div>`;
-                            return;
-                        }
+        return sId || "";
+    }
 
-                        container.innerHTML = stores.map(store => `
-                            <div onclick="selectStore('${store.spreadsheetId}', '${store.storeName}')" class="bg-slate-800 hover:bg-orange-600/20 border border-slate-700/80 hover:border-orange-500 p-4 rounded-2xl cursor-pointer transition flex justify-between items-center group">
-                                <div>
-                                    <div class="font-bold text-white text-base group-hover:text-orange-400 transition">${store.storeName}</div>
-                                    <div class="text-[10px] text-slate-400 font-mono mt-0.5">ID: ${store.spreadsheetId}</div>
-                                </div>
-                                <span class="text-orange-400 font-bold text-sm">เลือกสาขานี้ →</span>
-                            </div>
-                        `).join('');
+    let STORE_ID = getStoreId();
 
-                        // ถ้ามีร้านในระบบ ให้แสดงปุ่มปิด
-                        document.getElementById('closeModalBtn').classList.remove('hidden');
-                    } else {
-                        container.innerHTML = `<div class="text-center text-red-400 py-8 text-sm">ไม่สามารถโหลดรายชื่อร้านได้</div>`;
+    // ถ้าระบบหา Store ID ไม่เจอเลยจริงๆ ค่อยเด้งถามผู้ใช้งาน
+    if (!STORE_ID) {
+        Swal.fire({
+            title: 'ระบุรหัสร้านค้า',
+            text: 'ไม่พบข้อมูลร้านค้าในเครื่อง กรุณาระบุ Spreadsheet ID ของร้านคุณ',
+            input: 'text',
+            allowOutsideClick: false,
+            confirmButtonText: 'ตกลง',
+            confirmButtonColor: '#db2777'
+        }).then(res => {
+            if (res.value) {
+                localStorage.setItem('CURRENT_STORE_ID', res.value.trim());
+                location.reload();
+            }
+        });
+    } else {
+        localStorage.setItem('CURRENT_STORE_ID', STORE_ID);
+    }
+
+    // ==========================================
+    // 🧠 Google Script Proxy Engine (ปรับให้เข้ากับ API หลังบ้าน)
+    // ==========================================
+    const google = {
+        script: {
+            get run() {
+                let successCb = null; let failureCb = null;
+                const proxy = new Proxy({}, {
+                    get: function(target, prop) {
+                        if (prop === 'withSuccessHandler') { return function(cb) { successCb = cb; return proxy; }; }
+                        if (prop === 'withFailureHandler') { return function(cb) { failureCb = cb; return proxy; }; }
+                        return function(...args) {
+                            
+                            // 🟢 แทรก STORE_ID เข้าไปเป็น Argument ตัวแรกสุดอัตโนมัติ เพื่อให้ตรงกับโครงสร้าง Backend!
+                            let finalArgs = [STORE_ID, ...args];
+
+                            fetch(API_URL, {
+                                method: "POST",
+                                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                                body: JSON.stringify({ action: prop, args: finalArgs }),
+                                redirect: "follow"
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                if ((data.status === "Success" || data.success) && successCb) {
+                                    // คืนค่า result หรือ orders กลับไป
+                                    successCb(data.result || data.orders || data);
+                                }
+                                else if (failureCb) failureCb(data.message);
+                            })
+                            .catch(err => { 
+                                if(failureCb) failureCb(err); else console.error("Fetch Error:", err); 
+                            });
+                        };
                     }
-                })
-                .catch(err => {
-                    console.error(err);
-                    container.innerHTML = `<div class="text-center text-red-400 py-8 text-sm">เกิดข้อผิดพลาดในการเชื่อมต่อ</div>`;
                 });
+                return proxy;
+            }
         }
+    };
 
-        function selectStore(sId, sName) {
-            activeStoreId = sId;
-            document.getElementById('storeNameDisplay').innerText = sName;
-            document.getElementById('currentStoreSubText').innerText = `สาขา: ${sName}`;
-            document.getElementById('storeSelectorModal').classList.add('hidden');
+    let activeOrdersList = [];
+    let previousNewCount = 0;
 
-            // เริ่มโหลดออเดอร์ของร้านนี้
-            loadKitchenOrders();
+    function fetchKitchenOrders() {
+        if (!STORE_ID) return;
+        google.script.run
+            .withSuccessHandler(function(orders) {
+                // กรองออเดอร์
+                let filteredOrders = orders.filter(o => {
+                    let allowedStatuses = ["Pending", "รับออเดอร์แล้ว", "กำลังทำ"];
+                    let status = o.status || "Pending"; 
+                    return allowedStatuses.includes(status);
+                });
 
-            // ตั้งเวลารีเฟรชออเดอร์อัตโนมัติทุกๆ 10 วินาที
-            if (window.kitchenTimer) clearInterval(window.kitchenTimer);
-            window.kitchenTimer = setInterval(loadKitchenOrders, 10000);
-        }
+                // เสียงเตือนออเดอร์ใหม่
+                if (filteredOrders.length > activeOrdersList.length && activeOrdersList.length > 0) {
+                    playSound('doorbell.mp3');
+                }
 
-        function loadKitchenOrders() {
-            if (!activeStoreId) return;
-            let targetUrl = `${GAS_API_URL}?action=getKitchenOrdersBackend&storeId=${activeStoreId}`;
-            
-            fetch(targetUrl)
-                .then(res => res.json())
-                .then(res => {
-                    if (res.status === "Success") {
-                        renderKitchenBoard(res.orders || []);
-                    }
-                })
-                .catch(err => console.error("Kitchen Load Error:", err));
-        }
-
-        function renderKitchenBoard(orders) {
-            let container = document.getElementById('kitchenOrderCardsContainer');
-            if (!container) return;
-
-            let activeOrders = orders.filter(o => !o.status || o.status !== 'เสร็จสิ้น');
-
-            if (activeOrders.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full flex flex-col items-center justify-center text-slate-500 py-32 space-y-2">
-                        <span class="text-6xl">🎉</span>
-                        <div class="font-bold text-slate-400 text-lg">ไม่มีรายการอาหารค้างในครัวตอนนี้</div>
+                activeOrdersList = filteredOrders;
+                updateSummaryCounts();
+                renderKitchenCards();
+            })
+            .withFailureHandler(function(err) {
+                console.error("Kitchen Fetch Error:", err);
+                document.getElementById('kitchenGrid').innerHTML = `
+                    <div class="col-span-full h-96 flex flex-col items-center justify-center text-red-500 font-bold gap-2 text-center">
+                        <span class="text-5xl">❌</span>
+                        <span class="text-lg">ระบบการเชื่อมต่อคลาวด์ขัดข้อง:<br>
+                            <span class="text-xs text-pink-800 font-mono bg-white px-3 py-2 rounded-xl border border-pink-200 mt-2 inline-block shadow-sm">${err}</span>
+                        </span>
                     </div>`;
-                return;
+            })
+            .getKitchenOrdersBackend(); // 👈 เปลี่ยนเป็นเรียก Backend ตามที่เราเขียนไว้
+    }
+
+    function updateSummaryCounts() {
+        let countNew = 0, countAccepted = 0, countCooking = 0;
+        
+        activeOrdersList.forEach(o => {
+            let status = o.status || "Pending";
+            if (status === "Pending") countNew++;
+            else if (status === "รับออเดอร์แล้ว") countAccepted++;
+            else if (status === "กำลังทำ") countCooking++;
+        });
+
+        document.getElementById('countNew').innerText = countNew;
+        document.getElementById('countAccepted').innerText = countAccepted;
+        document.getElementById('countCooking').innerText = countCooking;
+        document.getElementById('countTotal').innerText = activeOrdersList.length;
+
+        if (countNew > previousNewCount && previousNewCount !== 0) {
+            triggerAudioEvent('newOrder');
+        }
+        previousNewCount = countNew;
+    }
+
+    let currentStatusFilter = 'All'; 
+
+    function setFilter(status) {
+        currentStatusFilter = status;
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.classList.remove('border-pink-500', 'ring-2', 'ring-pink-300');
+            if(tab.id === 'tab-' + status) {
+                tab.classList.add('border-pink-500', 'ring-2', 'ring-pink-300');
+            }
+        });
+        renderKitchenCards();
+    }
+
+    function renderKitchenCards() {
+        const grid = document.getElementById('kitchenGrid');
+        let displayOrders = activeOrdersList;
+        
+        if (currentStatusFilter !== 'All') {
+            displayOrders = activeOrdersList.filter(o => (o.status || "Pending") === currentStatusFilter);
+        }
+
+        if (displayOrders.length === 0) {
+            grid.innerHTML = `
+            <div class="col-span-full h-96 flex flex-col items-center justify-center text-pink-300 font-bold gap-2">
+                <span class="text-6xl">🎉</span>
+                <span class="text-xl text-pink-700">ไม่มีออเดอร์ในสถานะนี้</span>
+            </div>`;
+            return;
+        }
+
+        let html = '';
+
+        displayOrders.forEach(order => {
+            let status = order.status || "Pending";
+            let cardColor = "bg-white border-pink-100";
+            if (status === "รับออเดอร์แล้ว") cardColor = "bg-amber-50 border-amber-300";
+            else if (status === "กำลังทำ") cardColor = "bg-purple-50 border-purple-300"; 
+            else if (status === "Pending") cardColor = "bg-red-50 border-red-300 animate-pulse";
+
+            // แยกและจัดกลุ่มรายการสินค้า
+            const groupedItems = {};
+            if (Array.isArray(order.items)) {
+                order.items.forEach(item => {
+                    let mainName = item.name.trim();
+                    if (!groupedItems[mainName]) groupedItems[mainName] = { name: mainName, qty: 0 };
+                    groupedItems[mainName].qty += (item.qty || 1);
+                });
             }
 
-            container.innerHTML = activeOrders.map((order, idx) => {
-                let itemsList = Array.isArray(order.items) ? order.items : [];
+            let itemsHtml = "";
+            Object.values(groupedItems).forEach(item => {
+                itemsHtml += `
+                <div class="py-2 border-b border-pink-100/50 flex justify-between items-center font-bold text-gray-800">
+                    <span>${item.name}</span>
+                    <span class="text-pink-600 bg-white px-2 py-0.5 rounded-lg border border-pink-100 shadow-sm">x${item.qty}</span>
+                </div>`;
+            });
 
-                return `
-                    <div class="bg-slate-900 border-2 border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all">
-                        <div class="absolute top-0 left-0 right-0 h-2 bg-orange-500"></div>
+            // 🔘 ปุ่มกดอัปเดตสถานะ
+            let actionButtonHtml = "";
+            if (status === "กำลังทำ") {
+                actionButtonHtml = `<button onclick="serveOrder('${order.orderId}', '${order.tableNo}')" class="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-emerald-700 transition active:scale-95 transform">✅ เสร็จแล้ว</button>`;
+            } else if (status === "รับออเดอร์แล้ว") {
+                actionButtonHtml = `<button onclick="updateKitchenStatus('${order.orderId}', 'กำลังทำ')" class="w-full bg-purple-500 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-purple-600 transition active:scale-95 transform">👨‍🍳 เริ่มทำอาหาร</button>`;
+            } else {
+                actionButtonHtml = `<button onclick="updateKitchenStatus('${order.orderId}', 'รับออเดอร์แล้ว')" class="w-full bg-pink-600 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-pink-700 transition active:scale-95 transform">📥 รับออเดอร์</button>`;
+            }
+
+            let displayTable = order.tableNo || order.orderType || 'ทานที่ร้าน';
+            let queueText = order.queueNo && order.queueNo !== "-" ? order.queueNo : order.orderId.slice(-4);
+
+            html += `
+            <div class="rounded-[2rem] border-2 flex flex-col justify-between shadow-sm h-[420px] transition-all ${cardColor}">
+                <div class="p-5 flex flex-col overflow-hidden h-full">
+                    <div class="flex justify-between items-start mb-3 border-b border-pink-100/50 pb-2">
                         <div>
-                            <div class="flex justify-between items-start mb-3 border-b border-slate-800 pb-3">
-                                <div>
-                                    <div class="text-orange-400 font-black text-lg">${order.orderId || ('#00' + idx)}</div>
-                                    <div class="text-xs text-slate-400 font-medium mt-0.5">โต๊ะ: <span class="text-white font-bold">${order.tableNo || 'ทานที่ร้าน'}</span></div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-[10px] text-slate-500 font-medium">เวลาสั่ง</div>
-                                    <div class="text-xs font-bold text-slate-300">${order.timestamp || '-'}</div>
-                                </div>
-                            </div>
-                            <div class="space-y-2 my-3">
-                                ${itemsList.map(item => `
-                                    <div class="flex justify-between items-center bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
-                                        <span class="font-bold text-slate-200 text-sm">${item.name}</span>
-                                        <span class="bg-orange-500/10 text-orange-400 font-black text-sm px-3 py-1 rounded-xl border border-orange-500/20">x${item.qty || 1}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
+                            <div class="text-2xl font-black text-pink-800">#${queueText}</div>
+                            <div class="text-xs font-bold text-pink-600 mt-1">${order.timestamp}</div>
                         </div>
-                        <div class="pt-3 border-t border-slate-800 mt-2">
-                            <button onclick="markOrderCompleted('${order.orderId}')" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-xs shadow-lg shadow-emerald-900/20 transition active:scale-95 flex items-center justify-center gap-2">
-                                <span>✅</span> 
-                                <span>ทำอาหารเสร็จแล้ว (เสิร์ฟ)</span>
-                            </button>
-                        </div>
+                        <div class="text-xs font-bold px-3 py-1.5 rounded-xl bg-white border border-pink-100 text-pink-700 shadow-sm flex items-center gap-1">🍽️ ${displayTable}</div>
                     </div>
-                `;
-            }).join('');
-        }
+                    <div class="flex-1 overflow-y-auto no-scrollbar">${itemsHtml}</div>
+                </div>
+                <div class="p-4 border-t border-pink-100/60 bg-white/50 rounded-b-[2rem]">
+                    ${actionButtonHtml}
+                </div>
+            </div>`;
+        });
+        grid.innerHTML = html;
+    }
 
-        function markOrderCompleted(orderId) {
-            Swal.fire({
-                title: 'กำลังอัปเดตออเดอร์...',
-                allowOutsideClick: false,
-                didOpen: () => Swal.showLoading()
-            });
-
-            let payload = {
-                action: "updateOrderStatusBackend",
-                args: [activeStoreId, orderId, 'เสร็จสิ้น']
-            };
-
-            fetch(GAS_API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify(payload)
+    function updateKitchenStatus(orderId, status) {
+        showToast("กำลังอัปเดตสถานะ...", "info");
+        google.script.run
+            .withSuccessHandler(function() {
+                 showToast(`อัปเดตเป็น '${status}' แล้ว!`, "success");
+                 fetchKitchenOrders();
             })
-            .then(res => res.json())
-            .then(res => {
-                Swal.close();
-                if (res.status === "Success") {
-                    loadKitchenOrders();
-                } else {
-                    Swal.fire('เกิดข้อผิดพลาด', res.message || 'ไม่สามารถอัปเดตได้', 'error');
+            .withFailureHandler(function(err) {
+                 Swal.fire('ข้อผิดพลาดระบบ', err || 'ไม่สามารถอัปเดตสถานะได้', 'error');
+            })
+            .updateOrderStatusBackend(orderId, status); // 👈 เรียกฟังก์ชัน Backend
+    }
+
+    function serveOrder(orderId, tableNo) {
+        let order = activeOrdersList.find(o => o.orderId === orderId);
+
+        google.script.run
+            .withSuccessHandler(function(res) {
+                // 🔊 เล่นเสียงกริ่ง
+                playSound('bellding.mp3'); 
+                
+                // 🎙️ ต่อด้วยเสียงพูด (ถ้าเจอข้อมูลออเดอร์)
+                if (order) {
+                    setTimeout(() => speakOrderReady(order), 1000); // ดีเลย์ 1 วิให้เสียงกริ่งจบก่อน
                 }
+
+                showToast(`เคลียร์บิล ${orderId.slice(-4)} เรียบร้อยแล้ว`, "success");
+                fetchKitchenOrders();
             })
-            .catch(err => {
-                Swal.close();
-                console.error("Error updating order:", err);
-            });
+            .withFailureHandler(function(err) {
+                Swal.fire('ข้อผิดพลาดระบบ', 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้', 'error');
+            })
+            .updateOrderStatusBackend(orderId, 'เสร็จสิ้น'); // 👈 สั่งให้ Backend ปรับเป็น "เสร็จสิ้น"
+    }
+
+    function updateClock() {
+      const clock = document.getElementById('clockTime');
+      if (!clock) return;
+      clock.innerText = new Date().toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    function showToast(message, type = "success") {
+      const container = document.getElementById('toastContainer');
+      if (!container) return; 
+      
+      const toast = document.createElement('div');
+      const bgColor = type === 'error' ? 'bg-red-500' : 'bg-pink-600';
+      
+      toast.className = `flex items-center gap-3 ${bgColor} text-white px-6 py-4 rounded-2xl shadow-2xl transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto font-bold text-lg`;
+      toast.innerHTML = `<span class="text-xl">${type === 'error' ? '❌' : '✅'}</span> <span>${message}</span>`;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => { 
+        toast.classList.remove('translate-x-full', 'opacity-0'); 
+        toast.classList.add('translate-x-0', 'opacity-100'); 
+      }, 50);
+
+      setTimeout(() => { 
+        toast.classList.remove('translate-x-0', 'opacity-100'); 
+        toast.classList.add('translate-x-full', 'opacity-0'); 
+        setTimeout(() => toast.remove(), 300); 
+      }, 3000);
+    }
+
+    // เริ่มทำงานครั้งแรก และตั้งเวลา Refresh
+    fetchKitchenOrders();
+    setInterval(fetchKitchenOrders, 15000); // รีเฟรชทุกๆ 15 วินาที
+
+    // ==========================================
+    // 🔊 ระบบฟังก์ชันเสียง สำหรับหน้าจอครัว
+    // ==========================================
+    function speakThai(text) {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        
+        let msg = new SpeechSynthesisUtterance();
+        msg.text = text;
+        msg.lang = 'th-TH'; 
+        msg.rate = 0.8;      
+        msg.pitch = 1.1;    
+
+        window.speechSynthesis.speak(msg);
+    }
+
+    function triggerAudioEvent(event, data = {}) {
+        let audioSettings = JSON.parse(localStorage.getItem('famepos_audio_settings')) || { 
+            orderReady: true, 
+            newOrder: true 
+        };
+
+        if (!audioSettings[event]) return; 
+
+        switch (event) {
+            case 'newOrder':
+                speakThai("ออเดอร์ใหม่เข้ามาแล้วจ้า");
+                break;
         }
-    </script>
+    }
+
+    function playSound(filename) {
+        // เปลี่ยนตรงนี้ ให้เป็นโฟลเดอร์/URL ไฟล์เสียงที่ใช้ได้จริง
+        const baseUrl = "https://famepos.github.io/kitchen/"; 
+        const audio = new Audio(baseUrl + filename);
+        audio.play().catch(e => console.warn("Audio blocked or file not found:", e));
+    }
+
+    function speakOrderReady(order) {
+        let text = "";
+        let displayTable = order.tableNo || order.orderType || 'ทานที่ร้าน';
+        let queueText = order.queueNo && order.queueNo !== "-" ? order.queueNo : order.orderId.slice(-4);
+        
+        if (displayTable.includes("โต๊ะ")) {
+            text = `อาหารของ ${displayTable} พร้อมเสิร์ฟแล้วค่ะ`;
+        } 
+        else if (displayTable.includes("กลับบ้าน")) {
+            text = `ออเดอร์ กลับบ้าน คิวที่ ${queueText} อาหารพร้อมเสิร์ฟแล้วค่ะ`;
+        } 
+        else { 
+            text = `ออเดอร์ ${displayTable} คิวที่ ${queueText} อาหารพร้อมเสิร์ฟแล้วค่ะ`;
+        }
+
+        speakThai(text);
+    }
+  </script>
 </body>
 </html>

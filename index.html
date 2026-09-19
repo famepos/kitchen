@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fame POS - จอแสดงผลในครัว (Kitchen Display)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header ครัว -->
+    <header class="bg-slate-900 border-b border-slate-800 p-4 shrink-0 flex justify-between items-center shadow-lg z-10">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">🍳</span>
+            <div>
+                <h1 id="storeNameDisplay" class="text-xl font-bold text-orange-400">กำลังเชื่อมต่อร้าน...</h1>
+                <p class="text-xs text-slate-400">จอแสดงออเดอร์ห้องครัว (Kitchen Display System)</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="loadKitchenOrders()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-orange-400 border border-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm">
+                <span>🔄</span> รีเฟรช
+            </button>
+            <div class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> ออนไลน์ (Live)
+            </div>
+        </div>
+    </header>
+
+    <!-- พื้นที่แสดงการ์ดออเดอร์ (Kanban Board) -->
+    <main class="flex-1 overflow-y-auto p-6 no-scrollbar">
+        <div id="kitchenOrderCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 content-start">
+            <div class="col-span-full text-center text-slate-500 py-28 font-bold text-base">
+                ⏳ กำลังโหลดรายการอาหารเข้าครัว...
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 📌 ใส่ลิงก์ Google Apps Script Web App (ลิงก์ /exec ของคุณ)
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwVwzvMQA7vNWfh5RHTtNhSUrvFVBMKxIjMKmKm7ylD5wIGPvO8sj_lo1feUGAXvz3D/exec";
+
+        // ดึง storeId จาก URL (เช่น kitchen-famepos.vercel.app/?storeId=YOUR_STORE_ID)
+        const urlParams = new URLSearchParams(window.location.search);
+        const storeId = urlParams.get('storeId');
+
+        window.onload = function() {
+            if (!storeId) {
+                document.body.innerHTML = `
+                    <div class="flex h-screen items-center justify-center font-bold text-red-400 text-center p-6 bg-slate-950">
+                        ❌ ไม่พบรหัสร้านค้า (storeId) ในลิงก์<br>กรุณาตรวจสอบ URL ให้ถูกต้อง
+                    </div>`;
+                return;
+            }
+            
+            // โหลดข้อมูลร้านและออเดอร์ทันที
+            loadKitchenOrders();
+
+            // ตั้งเวลารีเฟรชออเดอร์อัตโนมัติทุกๆ 10 วินาที
+            setInterval(loadKitchenOrders, 10000);
+        };
+
+        function loadKitchenOrders() {
+            let targetUrl = `${GAS_API_URL}?action=getKitchenOrdersBackend&storeId=${storeId}`;
+            
+            fetch(targetUrl)
+                .then(res => res.json())
+                .then(res => {
+                    if (res.status === "Success") {
+                        if (res.storeName) {
+                            document.getElementById('storeNameDisplay').innerText = res.storeName;
+                        }
+                        renderKitchenBoard(res.orders || []);
+                    }
+                })
+                .catch(err => console.error("Kitchen Load Error:", err));
+        }
+
+        function renderKitchenBoard(orders) {
+            let container = document.getElementById('kitchenOrderCardsContainer');
+            if (!container) return;
+
+            // กรองเฉพาะออเดอร์ที่ยังไม่เสร็จ
+            let activeOrders = orders.filter(o => !o.status || o.status !== 'เสร็จสิ้น');
+
+            if (activeOrders.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full flex flex-col items-center justify-center text-slate-500 py-32 space-y-2">
+                        <span class="text-6xl">🎉</span>
+                        <div class="font-bold text-slate-400 text-lg">ไม่มีรายการอาหารค้างในครัวตอนนี้</div>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = activeOrders.map((order, idx) => {
+                let itemsList = Array.isArray(order.items) ? order.items : [];
+
+                return `
+                    <div class="bg-slate-900 border-2 border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all">
+                        <div class="absolute top-0 left-0 right-0 h-2 bg-orange-500"></div>
+                        
+                        <div>
+                            <div class="flex justify-between items-start mb-3 border-b border-slate-800 pb-3">
+                                <div>
+                                    <div class="text-orange-400 font-black text-lg">${order.orderId || ('#00' + idx)}</div>
+                                    <div class="text-xs text-slate-400 font-medium mt-0.5">โต๊ะ: <span class="text-white font-bold">${order.tableNo || 'ทานที่ร้าน'}</span></div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-[10px] text-slate-500 font-medium">เวลาสั่ง</div>
+                                    <div class="text-xs font-bold text-slate-300">${order.timestamp || '-'}</div>
+                                </div>
+                            </div>
+
+                            <!-- รายการอาหาร -->
+                            <div class="space-y-2 my-3">
+                                ${itemsList.map(item => `
+                                    <div class="flex justify-between items-center bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                                        <span class="font-bold text-slate-200 text-sm">${item.name}</span>
+                                        <span class="bg-orange-500/10 text-orange-400 font-black text-sm px-3 py-1 rounded-xl border border-orange-500/20">x${item.qty || 1}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-800 mt-2">
+                            <button onclick="markOrderCompleted('${order.orderId}')" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-xs shadow-lg shadow-emerald-900/20 transition active:scale-95 flex items-center justify-center gap-2">
+                                <span>✅</span> 
+                                <span>ทำอาหารเสร็จแล้ว (เสิร์ฟ)</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function markOrderCompleted(orderId) {
+            Swal.fire({
+                title: 'กำลังอัปเดตออเดอร์...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            let payload = {
+                action: "updateOrderStatusBackend",
+                args: [storeId, orderId, 'เสร็จสิ้น']
+            };
+
+            fetch(GAS_API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(res => {
+                Swal.close();
+                if (res.status === "Success") {
+                    loadKitchenOrders();
+                } else {
+                    Swal.fire('เกิดข้อผิดพลาด', res.message || 'ไม่สามารถอัปเดตได้', 'error');
+                }
+            })
+            .catch(err => {
+                Swal.close();
+                console.error("Error updating order:", err);
+            });
+        }
+    </script>
+</body>
+</html>

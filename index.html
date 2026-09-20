@@ -1,7 +1,110 @@
-<script>
-    // 📌 ใส่ลิงก์ Google Apps Script Web App ของคุณที่นี่
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FamePOS Kitchen</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <link rel="icon" type="image/png" href="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="KDS FamePOS">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap');
+    body { font-family: 'Kanit', sans-serif; background-color: var(--bg-app); color: #4e0606; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #fdecec; }
+    ::-webkit-scrollbar-thumb { background: #fad1d1; border-radius: 10px; }
+
+    .item-done {
+        text-decoration: line-through;
+        opacity: 0.5;
+        background-color: #fff1f2;
+    }
+    
+    /* 🎨 ปรับโทนสี FamePOS Kitchen ให้เป็นอันหนึ่งอันเดียวกัน */
+    :root {
+        --primary: #db2777; /* ชมพูเข้ม FamePOS */
+        --bg-app: #fdecec;  /* พื้นหลังชมพูอ่อน */
+        --border-app: #fad1d1;
+    }
+
+    /* ปุ่มสถานะตามสีแอป */
+    .btn-new { background-color: #f43f5e; color: white; }      /* แดงชมพู (ออเดอร์ใหม่) */
+    .btn-cooking { background-color: #d97706; color: white; }  /* ส้มทอง (กำลังทำ) */
+    .btn-done { background-color: #059669; color: white; }     /* เขียว (เสร็จแล้ว) */
+
+    .filter-tab {
+        transition: all 0.2s;
+    }
+    .filter-tab.active-tab {
+        border: 3px solid #db2777 !important; /* สีชมพู FamePOS */
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+  
+  <div id="toastContainer" class="fixed top-5 right-5 z-[10000] flex flex-col gap-3 pointer-events-none w-80"></div>
+
+  <!-- ส่วน Header -->
+  <header class="bg-white border-b border-pink-100 p-4 flex justify-between items-center shrink-0 shadow-sm z-10">
+    <div class="flex items-center gap-3">
+      <img src="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png" alt="Kitchen Logo" class="w-12 h-12 object-contain drop-shadow-sm">
+      <div>
+        <h1 class="text-xl font-bold text-pink-800 tracking-wide">FamePOS จอห้องครัว</h1>
+        <p class="text-xs text-pink-500/80">ระบบอัปเดตคิวและรายการอาหารอัตโนมัติ Real-time</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="text-right">
+        <div id="clockTime" class="text-xl font-black text-pink-600 tracking-wider">00:00:00</div>
+      </div>
+      <button onclick="fetchKitchenOrders()" class="bg-pink-50 hover:bg-pink-100 border border-pink-200 px-4 py-2 rounded-xl text-sm font-bold text-pink-700 transition flex items-center gap-1.5 shadow-sm active:scale-95 transform">
+        🔄 รีเฟรชคิวอาหาร
+      </button>
+    </div>
+  </header>
+
+  <!-- แถบสรุปสถานะออเดอร์ -->
+  <div class="bg-white border-b border-pink-100 px-6 py-3 shrink-0 flex justify-between items-center shadow-sm">
+    <div class="flex gap-4 w-full">
+        <div id="tab-Pending" onclick="setFilter('Pending')" class="filter-tab flex-1 bg-red-50 border-2 border-red-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-red-100 transition">
+            <div class="text-xs font-bold text-red-400">ออเดอร์ใหม่</div>
+            <div id="countNew" class="text-2xl font-black text-red-600">0</div>
+        </div>
+        <div id="tab-รับออเดอร์แล้ว" onclick="setFilter('รับออเดอร์แล้ว')" class="filter-tab flex-1 bg-amber-50 border-2 border-amber-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-amber-100 transition">
+            <div class="text-xs font-bold text-amber-500">รับออเดอร์แล้ว</div>
+            <div id="countAccepted" class="text-2xl font-black text-amber-600">0</div>
+        </div>
+        <div id="tab-กำลังทำ" onclick="setFilter('กำลังทำ')" class="filter-tab flex-1 bg-purple-50 border-2 border-purple-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-purple-100 transition">
+            <div class="text-xs font-bold text-purple-500">กำลังทำ</div>
+            <div id="countCooking" class="text-2xl font-black text-purple-600">0</div>
+        </div>
+        <div id="tab-All" onclick="setFilter('All')" class="filter-tab flex-1 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-emerald-100 transition">
+            <div class="text-xs font-bold text-emerald-500">รวมทั้งหมด</div>
+            <div id="countTotal" class="text-2xl font-black text-emerald-700">0</div>
+        </div>
+    </div>
+  </div>
+
+  <main id="kitchenGrid" class="flex-1 p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 overflow-y-auto content-start">
+    <div class="col-span-full h-96 flex flex-col items-center justify-center text-pink-400 font-bold gap-3">
+      <span class="text-5xl animate-spin">⏳</span>
+      <span class="text-lg">กำลังดึงคิวใบสั่งอาหารจากระบบหลังบ้าน...</span>
+    </div>
+  </main>
+
+  <script>
+    // 📌 ลิงก์ API หลังบ้านของคุณ
     const API_URL = "https://script.google.com/macros/s/AKfycbwVwzvMQA7vNWfh5RHTtNhSUrvFVBMKxIjMKmKm7ylD5wIGPvO8sj_lo1feUGAXvz3D/exec";
 
+    // 🌟 ระบบตรวจจับ Store ID อัจฉริยะ 🌟
     function getStoreId() {
         const urlParams = new URLSearchParams(window.location.search);
         let sId = urlParams.get('storeId');
@@ -33,6 +136,9 @@
         localStorage.setItem('CURRENT_STORE_ID', STORE_ID);
     }
 
+    // ==========================================
+    // 🧠 Google Script Proxy Engine (ฉบับอัปเกรด แทรก Store ID ให้อัตโนมัติ)
+    // ==========================================
     const google = {
         script: {
             get run() {
@@ -43,6 +149,7 @@
                         if (prop === 'withFailureHandler') { return function(cb) { failureCb = cb; return proxy; }; }
                         return function(...args) {
                             
+                            // 🟢 หัวใจสำคัญ: เอา STORE_ID ไปยัดไว้เป็นตัวแปรแรกสุดเสมอ!
                             let finalArgs = [STORE_ID, ...args];
 
                             fetch(API_URL, {
@@ -77,7 +184,7 @@
         google.script.run
             .withSuccessHandler(function(orders) {
                 // 🟢 ปิดการกรอง "วันนี้" ทิ้งไปเลย เพื่อป้องกันปัญหาปี พ.ศ. ไม่ตรง 
-                // ให้ระบบโชว์ออเดอร์ทั้งหมดที่สถานะยังไม่ "เสร็จสิ้น"
+                // ให้ระบบโชว์ออเดอร์ทั้งหมดที่สถานะยังไม่ "เสิร์ฟแล้ว"
                 let filteredOrders = orders.filter(o => {
                     let allowedStatuses = ["Pending", "รับออเดอร์แล้ว", "กำลังทำ"];
                     let status = o.status || "Pending"; 
@@ -105,7 +212,7 @@
                     </div>`;
                 }
             })
-            .getKitchenOrdersGS();
+            .getKitchenOrdersGS(); 
     }
 
     function updateSummaryCounts() {
@@ -118,7 +225,6 @@
             else if (status === "กำลังทำ") countCooking++;
         });
 
-        // 🟢 ใส่ if ครอบไว้ป้องกัน Error Cannot set properties of null
         let elNew = document.getElementById('countNew');
         if (elNew) elNew.innerText = countNew;
         
@@ -243,17 +349,17 @@
             .withFailureHandler(function(err) {
                  Swal.fire('ข้อผิดพลาดระบบ', err || 'ไม่สามารถอัปเดตสถานะได้', 'error');
             })
-            .updateKitchenStatusGS(STORE_ID, rowIdx, source, status); // 👈 เพิ่มการส่ง STORE_ID
+            .updateKitchenStatusGS(rowIdx, source, status);
     }
 
-    function serveOrder(rowIdx, queueNo, source = "Sales") {
+    function serveOrder(rowIdx, orderId, source = "Sales") {
         let order = activeOrdersList.find(o => o.rowIdx == rowIdx && o.source == source);
         google.script.run
             .withSuccessHandler(function(res) {
                 if (res === "Success") {
                     playSound('bellding.mp3'); 
                     if (order) setTimeout(() => speakOrderReady(order), 1000); 
-                    showToast(`เคลียร์คิว ${queueNo} เรียบร้อยแล้ว`, "success");
+                    showToast(`เคลียร์คิวเรียบร้อยแล้ว`, "success");
                     fetchKitchenOrders();
                 } else {
                     Swal.fire('ผิดพลาด', res, 'error');
@@ -262,7 +368,7 @@
             .withFailureHandler(function(err) {
                 Swal.fire('ข้อผิดพลาดระบบ', 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้', 'error');
             })
-            .completeKitchenOrderGS(STORE_ID, rowIdx, source); // 👈 เพิ่มการส่ง STORE_ID
+            .completeKitchenOrderGS(rowIdx, source); 
     }
 
     function updateClock() {
@@ -313,7 +419,7 @@
     }
 
     function playSound(filename) {
-        const baseUrl = "https://famepos.github.io/restaurant/"; 
+        const baseUrl = "https://famepos.github.io/kitchen/"; 
         const audio = new Audio(baseUrl + filename);
         audio.play().catch(e => console.warn("Audio blocked:", e));
     }
@@ -330,8 +436,7 @@
         speakThai(text);
     }
 
-    // 🟢 เอาคำสั่งโหลดข้อมูลมาใส่ใน DOMContentLoaded 
-    // เพื่อบังคับให้โหลดโครงสร้างหน้าเว็บให้เสร็จก่อน ถึงจะเริ่มดึงข้อมูล (แก้ Error แดงๆ ใน Vercel ได้ 100%)
+    // 🟢 เอาคำสั่งโหลดข้อมูลมาใส่ใน DOMContentLoaded เพื่อให้ HTML วาดเสร็จก่อนเสมอ
     document.addEventListener('DOMContentLoaded', function() {
         updateClock();
         setInterval(updateClock, 1000);
@@ -340,3 +445,5 @@
         setInterval(fetchKitchenOrders, 15000);
     });
   </script>
+</body>
+</html>

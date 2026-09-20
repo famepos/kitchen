@@ -1,8 +1,7 @@
 <script>
-    // 📌 ลิงก์ API หลังบ้านของคุณ
+    // 📌 ใส่ลิงก์ Google Apps Script Web App ของคุณที่นี่
     const API_URL = "https://script.google.com/macros/s/AKfycbwVwzvMQA7vNWfh5RHTtNhSUrvFVBMKxIjMKmKm7ylD5wIGPvO8sj_lo1feUGAXvz3D/exec";
 
-    // 🌟 ระบบตรวจจับ Store ID อัจฉริยะ 🌟
     function getStoreId() {
         const urlParams = new URLSearchParams(window.location.search);
         let sId = urlParams.get('storeId');
@@ -34,9 +33,6 @@
         localStorage.setItem('CURRENT_STORE_ID', STORE_ID);
     }
 
-    // ==========================================
-    // 🧠 Google Script Proxy Engine (ฉบับอัปเกรด แทรก Store ID ให้อัตโนมัติ)
-    // ==========================================
     const google = {
         script: {
             get run() {
@@ -47,7 +43,6 @@
                         if (prop === 'withFailureHandler') { return function(cb) { failureCb = cb; return proxy; }; }
                         return function(...args) {
                             
-                            // 🟢 หัวใจสำคัญ: เอา STORE_ID ไปยัดไว้เป็นตัวแปรแรกสุดเสมอ!
                             let finalArgs = [STORE_ID, ...args];
 
                             fetch(API_URL, {
@@ -81,19 +76,14 @@
         if (!STORE_ID) return;
         google.script.run
             .withSuccessHandler(function(orders) {
-                // กรองเฉพาะของวันนี้
-                let now = new Date();
-                let startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
-                let endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
-
+                // 🟢 ปิดการกรอง "วันนี้" ทิ้งไปเลย เพื่อป้องกันปัญหาปี พ.ศ. ไม่ตรง 
+                // ให้ระบบโชว์ออเดอร์ทั้งหมดที่สถานะยังไม่ "เสร็จสิ้น"
                 let filteredOrders = orders.filter(o => {
-                    let isToday = o.timestamp >= startOfDay && o.timestamp <= endOfDay;
                     let allowedStatuses = ["Pending", "รับออเดอร์แล้ว", "กำลังทำ"];
                     let status = o.status || "Pending"; 
-                    return isToday && allowedStatuses.includes(status);
+                    return allowedStatuses.includes(status);
                 });
 
-                // เสียงเตือนออเดอร์ใหม่
                 if (filteredOrders.length > activeOrdersList.length && activeOrdersList.length > 0) {
                     playSound('doorbell.mp3');
                 }
@@ -104,15 +94,18 @@
             })
             .withFailureHandler(function(err) {
                 console.error("Kitchen Fetch Error:", err);
-                document.getElementById('kitchenGrid').innerHTML = `
+                let grid = document.getElementById('kitchenGrid');
+                if (grid) {
+                    grid.innerHTML = `
                     <div class="col-span-full h-96 flex flex-col items-center justify-center text-red-500 font-bold gap-2 text-center">
                         <span class="text-5xl">❌</span>
                         <span class="text-lg">ระบบการเชื่อมต่อคลาวด์ขัดข้อง:<br>
                             <span class="text-xs text-pink-800 font-mono bg-white px-3 py-2 rounded-xl border border-pink-200 mt-2 inline-block shadow-sm">${err}</span>
                         </span>
                     </div>`;
+                }
             })
-            .getKitchenOrdersGS(); // 👈 ตอนนี้ตัว Proxy จะส่ง STORE_ID ไปให้เองแล้ว!
+            .getKitchenOrdersGS();
     }
 
     function updateSummaryCounts() {
@@ -125,10 +118,18 @@
             else if (status === "กำลังทำ") countCooking++;
         });
 
-        document.getElementById('countNew').innerText = countNew;
-        document.getElementById('countAccepted').innerText = countAccepted;
-        document.getElementById('countCooking').innerText = countCooking;
-        document.getElementById('countTotal').innerText = activeOrdersList.length;
+        // 🟢 ใส่ if ครอบไว้ป้องกัน Error Cannot set properties of null
+        let elNew = document.getElementById('countNew');
+        if (elNew) elNew.innerText = countNew;
+        
+        let elAcc = document.getElementById('countAccepted');
+        if (elAcc) elAcc.innerText = countAccepted;
+        
+        let elCook = document.getElementById('countCooking');
+        if (elCook) elCook.innerText = countCooking;
+        
+        let elTot = document.getElementById('countTotal');
+        if (elTot) elTot.innerText = activeOrdersList.length;
 
         if (countNew > previousNewCount && previousNewCount !== 0) {
             triggerAudioEvent('newOrder');
@@ -151,6 +152,8 @@
 
     function renderKitchenCards() {
         const grid = document.getElementById('kitchenGrid');
+        if (!grid) return;
+
         let displayOrders = activeOrdersList;
         
         if (currentStatusFilter !== 'All') {
@@ -197,7 +200,7 @@
                 itemsHtml += `
                 <div class="py-2 border-b border-pink-100/50 flex justify-between items-center font-bold text-gray-800">
                     <span>${item.name}</span>
-                    <span class="text-pink-600 bg-white px-2 py-0.5 rounded-lg border border-pink-100">x${item.qty}</span>
+                    <span class="text-pink-600 bg-white px-2 py-0.5 rounded-lg border border-pink-100 shadow-sm">x${item.qty}</span>
                 </div>`;
             });
 
@@ -215,10 +218,10 @@
                 <div class="p-5 flex flex-col overflow-hidden h-full">
                     <div class="flex justify-between items-start mb-3 border-b border-pink-100/50 pb-2">
                         <div>
-                            <div class="text-2xl font-black text-pink-800">${order.queueNo}</div>
+                            <div class="text-2xl font-black text-pink-800">${order.queueNo || ''}</div>
                             <div class="text-xs font-bold text-pink-600 mt-1">${order.queueSubInfo || ''}</div>
                         </div>
-                        <div class="text-xs font-bold px-2 py-1 rounded-xl bg-white border border-pink-100 text-pink-700">${order.orderType}</div>
+                        <div class="text-xs font-bold px-2 py-1 rounded-xl bg-white border border-pink-100 text-pink-700">${order.orderType || ''}</div>
                     </div>
                     <div class="flex-1 overflow-y-auto">${itemsHtml}</div>
                 </div>
@@ -240,7 +243,7 @@
             .withFailureHandler(function(err) {
                  Swal.fire('ข้อผิดพลาดระบบ', err || 'ไม่สามารถอัปเดตสถานะได้', 'error');
             })
-            .updateKitchenStatusGS(rowIdx, source, status); // 👈 Proxy จะแอบยัด STORE_ID ให้เอง
+            .updateKitchenStatusGS(STORE_ID, rowIdx, source, status); // 👈 เพิ่มการส่ง STORE_ID
     }
 
     function serveOrder(rowIdx, queueNo, source = "Sales") {
@@ -259,7 +262,7 @@
             .withFailureHandler(function(err) {
                 Swal.fire('ข้อผิดพลาดระบบ', 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้', 'error');
             })
-            .completeKitchenOrderGS(rowIdx, source); // 👈 Proxy จะแอบยัด STORE_ID ให้เอง
+            .completeKitchenOrderGS(STORE_ID, rowIdx, source); // 👈 เพิ่มการส่ง STORE_ID
     }
 
     function updateClock() {
@@ -267,9 +270,6 @@
       if (!clock) return;
       clock.innerText = new Date().toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
-
-    updateClock();
-    setInterval(updateClock, 1000);
 
     function showToast(message, type = "success") {
       const container = document.getElementById('toastContainer');
@@ -289,9 +289,6 @@
         setTimeout(() => toast.remove(), 300); 
       }, 3000);
     }
-
-    fetchKitchenOrders();
-    setInterval(fetchKitchenOrders, 15000);
 
     function speakThai(text) {
         if (!('speechSynthesis' in window)) return;
@@ -332,4 +329,14 @@
         }
         speakThai(text);
     }
+
+    // 🟢 เอาคำสั่งโหลดข้อมูลมาใส่ใน DOMContentLoaded 
+    // เพื่อบังคับให้โหลดโครงสร้างหน้าเว็บให้เสร็จก่อน ถึงจะเริ่มดึงข้อมูล (แก้ Error แดงๆ ใน Vercel ได้ 100%)
+    document.addEventListener('DOMContentLoaded', function() {
+        updateClock();
+        setInterval(updateClock, 1000);
+        
+        fetchKitchenOrders();
+        setInterval(fetchKitchenOrders, 15000);
+    });
   </script>

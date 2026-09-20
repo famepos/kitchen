@@ -1,130 +1,21 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FamePOS Kitchen</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-  <link rel="icon" type="image/png" href="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png" sizes="192x192">
-  <link rel="apple-touch-icon" href="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="KDS FamePOS">
-  <meta name="mobile-web-app-capable" content="yes">
-
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap');
-    body { font-family: 'Kanit', sans-serif; background-color: var(--bg-app); color: #4e0606; }
-
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #fdecec; }
-    ::-webkit-scrollbar-thumb { background: #fad1d1; border-radius: 10px; }
-
-    .item-done {
-        text-decoration: line-through;
-        opacity: 0.5;
-        background-color: #fff1f2;
-    }
-    
-    /* 🎨 ปรับโทนสี FamePOS Kitchen ให้เป็นอันหนึ่งอันเดียวกัน */
-    :root {
-        --primary: #db2777; /* ชมพูเข้ม FamePOS */
-        --bg-app: #fdecec;  /* พื้นหลังชมพูอ่อน */
-        --border-app: #fad1d1;
-    }
-
-    /* ปุ่มสถานะตามสีแอป */
-    .btn-new { background-color: #f43f5e; color: white; }      /* แดงชมพู (ออเดอร์ใหม่) */
-    .btn-cooking { background-color: #d97706; color: white; }  /* ส้มทอง (กำลังทำ) */
-    .btn-done { background-color: #059669; color: white; }     /* เขียว (เสร็จแล้ว) */
-
-    .filter-tab {
-        transition: all 0.2s;
-    }
-    .filter-tab.active-tab {
-        border: 3px solid #db2777 !important; /* สีชมพู FamePOS */
-    }
-  </style>
-</head>
-<body class="h-screen flex flex-col overflow-hidden">
-  
-  <div id="toastContainer" class="fixed top-5 right-5 z-[10000] flex flex-col gap-3 pointer-events-none w-80"></div>
-
-  <!-- ส่วน Header -->
-  <header class="bg-white border-b border-pink-100 p-4 flex justify-between items-center shrink-0 shadow-sm z-10">
-    <div class="flex items-center gap-3">
-      <img src="https://i.postimg.cc/Znng4wjg/fe8393f8-8504-475f-976c-727390b6c790.png" alt="Kitchen Logo" class="w-12 h-12 object-contain drop-shadow-sm">
-      <div>
-        <h1 class="text-xl font-bold text-pink-800 tracking-wide">FamePOS จอห้องครัว</h1>
-        <p class="text-xs text-pink-500/80">ระบบอัปเดตคิวและรายการอาหารอัตโนมัติ Real-time</p>
-      </div>
-    </div>
-    <div class="flex items-center gap-4">
-      <div class="text-right">
-        <div id="clockTime" class="text-xl font-black text-pink-600 tracking-wider">00:00:00</div>
-      </div>
-      <button onclick="fetchKitchenOrders()" class="bg-pink-50 hover:bg-pink-100 border border-pink-200 px-4 py-2 rounded-xl text-sm font-bold text-pink-700 transition flex items-center gap-1.5 shadow-sm active:scale-95 transform">
-        🔄 รีเฟรชคิวอาหาร
-      </button>
-    </div>
-  </header>
-
-<!-- แถบสรุปสถานะออเดอร์ -->
-<div class="bg-white border-b border-pink-100 px-6 py-3 shrink-0 flex justify-between items-center shadow-sm">
-    <div class="flex gap-4 w-full">
-        <div id="tab-Pending" onclick="setFilter('Pending')" class="filter-tab flex-1 bg-red-50 border-2 border-red-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-red-100 transition">
-            <div class="text-xs font-bold text-red-400">ออเดอร์ใหม่</div>
-            <div id="countNew" class="text-2xl font-black text-red-600">0</div>
-        </div>
-        <div id="tab-รับออเดอร์แล้ว" onclick="setFilter('รับออเดอร์แล้ว')" class="filter-tab flex-1 bg-amber-50 border-2 border-amber-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-amber-100 transition">
-            <div class="text-xs font-bold text-amber-500">รับออเดอร์แล้ว</div>
-            <div id="countAccepted" class="text-2xl font-black text-amber-600">0</div>
-        </div>
-        <div id="tab-กำลังทำ" onclick="setFilter('กำลังทำ')" class="filter-tab flex-1 bg-purple-50 border-2 border-purple-100 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-purple-100 transition">
-            <div class="text-xs font-bold text-purple-500">กำลังทำ</div>
-            <div id="countCooking" class="text-2xl font-black text-purple-600">0</div>
-        </div>
-        <div id="tab-All" onclick="setFilter('All')" class="filter-tab flex-1 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-2 text-center shadow-sm cursor-pointer hover:bg-emerald-100 transition">
-            <div class="text-xs font-bold text-emerald-500">รวมทั้งหมด</div>
-            <div id="countTotal" class="text-2xl font-black text-emerald-700">0</div>
-        </div>
-    </div>
-</div>
-
-  <main id="kitchenGrid" class="flex-1 p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 overflow-y-auto content-start">
-    <div class="col-span-full h-96 flex flex-col items-center justify-center text-pink-400 font-bold gap-3">
-      <span class="text-5xl animate-spin">⏳</span>
-      <span class="text-lg">กำลังดึงคิวใบสั่งอาหารจากระบบหลังบ้าน...</span>
-    </div>
-  </main>
-
-  <script>
-    // 📌 ใส่ลิงก์ Google Apps Script Web App ของคุณที่นี่
+<script>
+    // 📌 ลิงก์ API หลังบ้านของคุณ
     const API_URL = "https://script.google.com/macros/s/AKfycbwVwzvMQA7vNWfh5RHTtNhSUrvFVBMKxIjMKmKm7ylD5wIGPvO8sj_lo1feUGAXvz3D/exec";
 
     // 🌟 ระบบตรวจจับ Store ID อัจฉริยะ 🌟
     function getStoreId() {
-        // 1. ลองดึงจาก URL ก่อน
         const urlParams = new URLSearchParams(window.location.search);
         let sId = urlParams.get('storeId');
-        
-        // 2. ถ้าไม่มี ลองดึงจาก localStorage (ของแอปครัวเดิม)
         if (!sId) sId = localStorage.getItem('CURRENT_STORE_ID');
-
-        // 3. 💥 ถ้ายังไม่มีอีก แสดงว่าเปิดบนเครื่องเดียวกับแอป POS หลัก ให้ไปดึงจาก pos_user มาใช้อัตโนมัติ!
         if (!sId) {
             let posUser = JSON.parse(localStorage.getItem('pos_user') || localStorage.getItem('fame_current_user') || 'null');
             if (posUser && posUser.spreadsheetId) sId = posUser.spreadsheetId;
         }
-
         return sId || "";
     }
 
     let STORE_ID = getStoreId();
 
-    // ถ้าระบบหา Store ID ไม่เจอเลยจริงๆ ค่อยเด้งถามผู้ใช้งาน
     if (!STORE_ID) {
         Swal.fire({
             title: 'ระบุรหัสร้านค้า',
@@ -144,7 +35,7 @@
     }
 
     // ==========================================
-    // 🧠 Google Script Proxy Engine (ปรับให้เข้ากับ API หลังบ้าน)
+    // 🧠 Google Script Proxy Engine (ฉบับอัปเกรด แทรก Store ID ให้อัตโนมัติ)
     // ==========================================
     const google = {
         script: {
@@ -156,7 +47,7 @@
                         if (prop === 'withFailureHandler') { return function(cb) { failureCb = cb; return proxy; }; }
                         return function(...args) {
                             
-                            // 🟢 แทรก STORE_ID เข้าไปเป็น Argument ตัวแรกสุดอัตโนมัติ เพื่อให้ตรงกับโครงสร้าง Backend!
+                            // 🟢 หัวใจสำคัญ: เอา STORE_ID ไปยัดไว้เป็นตัวแปรแรกสุดเสมอ!
                             let finalArgs = [STORE_ID, ...args];
 
                             fetch(API_URL, {
@@ -168,7 +59,6 @@
                             .then(res => res.json())
                             .then(data => {
                                 if ((data.status === "Success" || data.success) && successCb) {
-                                    // คืนค่า result หรือ orders กลับไป
                                     successCb(data.result || data.orders || data);
                                 }
                                 else if (failureCb) failureCb(data.message);
@@ -191,11 +81,16 @@
         if (!STORE_ID) return;
         google.script.run
             .withSuccessHandler(function(orders) {
-                // กรองออเดอร์
+                // กรองเฉพาะของวันนี้
+                let now = new Date();
+                let startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+                let endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
                 let filteredOrders = orders.filter(o => {
+                    let isToday = o.timestamp >= startOfDay && o.timestamp <= endOfDay;
                     let allowedStatuses = ["Pending", "รับออเดอร์แล้ว", "กำลังทำ"];
                     let status = o.status || "Pending"; 
-                    return allowedStatuses.includes(status);
+                    return isToday && allowedStatuses.includes(status);
                 });
 
                 // เสียงเตือนออเดอร์ใหม่
@@ -217,7 +112,7 @@
                         </span>
                     </div>`;
             })
-            .getKitchenOrdersBackend(); // 👈 เปลี่ยนเป็นเรียก Backend ตามที่เราเขียนไว้
+            .getKitchenOrdersGS(); // 👈 ตอนนี้ตัว Proxy จะส่ง STORE_ID ไปให้เองแล้ว!
     }
 
     function updateSummaryCounts() {
@@ -280,49 +175,52 @@
             else if (status === "กำลังทำ") cardColor = "bg-purple-50 border-purple-300"; 
             else if (status === "Pending") cardColor = "bg-red-50 border-red-300 animate-pulse";
 
-            // แยกและจัดกลุ่มรายการสินค้า
-            const groupedItems = {};
-            if (Array.isArray(order.items)) {
-                order.items.forEach(item => {
-                    let mainName = item.name.trim();
-                    if (!groupedItems[mainName]) groupedItems[mainName] = { name: mainName, qty: 0 };
-                    groupedItems[mainName].qty += (item.qty || 1);
-                });
+            const rawItems = []; let buffer = ""; let bracket = 0;
+            for (let ch of order.items) {
+                if (ch === "[") bracket++; if (ch === "]") bracket--;
+                if (ch === "," && bracket === 0) { rawItems.push(buffer.trim()); buffer = ""; } else { buffer += ch; }
             }
+            if (buffer.trim()) rawItems.push(buffer.trim());
+
+            const groupedItems = {};
+            rawItems.forEach(itemStr => {
+                let qtyMatch = itemStr.match(/\(x(\d+)\)/);
+                let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+                let baseName = itemStr.replace(/\s*\(x\d+\)/, "").trim();
+                let mainName = baseName.replace(/\[.*?\]/g, "").trim();
+                if (!groupedItems[mainName]) groupedItems[mainName] = { name: mainName, qty: 0 };
+                groupedItems[mainName].qty += qty;
+            });
 
             let itemsHtml = "";
             Object.values(groupedItems).forEach(item => {
                 itemsHtml += `
                 <div class="py-2 border-b border-pink-100/50 flex justify-between items-center font-bold text-gray-800">
                     <span>${item.name}</span>
-                    <span class="text-pink-600 bg-white px-2 py-0.5 rounded-lg border border-pink-100 shadow-sm">x${item.qty}</span>
+                    <span class="text-pink-600 bg-white px-2 py-0.5 rounded-lg border border-pink-100">x${item.qty}</span>
                 </div>`;
             });
 
-            // 🔘 ปุ่มกดอัปเดตสถานะ
             let actionButtonHtml = "";
             if (status === "กำลังทำ") {
-                actionButtonHtml = `<button onclick="serveOrder('${order.orderId}', '${order.tableNo}')" class="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-emerald-700 transition active:scale-95 transform">✅ เสร็จแล้ว</button>`;
+                actionButtonHtml = `<button onclick="serveOrder(${order.rowIdx}, '${order.orderId}', '${order.source}')" class="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-emerald-700 transition active:scale-95 transform">✅ เสร็จแล้ว</button>`;
             } else if (status === "รับออเดอร์แล้ว") {
-                actionButtonHtml = `<button onclick="updateKitchenStatus('${order.orderId}', 'กำลังทำ')" class="w-full bg-purple-500 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-purple-600 transition active:scale-95 transform">👨‍🍳 เริ่มทำอาหาร</button>`;
+                actionButtonHtml = `<button onclick="updateKitchenStatus(${order.rowIdx}, '${order.source}', 'กำลังทำ')" class="w-full bg-purple-500 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-purple-600 transition active:scale-95 transform">👨‍🍳 เริ่มทำอาหาร</button>`;
             } else {
-                actionButtonHtml = `<button onclick="updateKitchenStatus('${order.orderId}', 'รับออเดอร์แล้ว')" class="w-full bg-pink-600 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-pink-700 transition active:scale-95 transform">📥 รับออเดอร์</button>`;
+                actionButtonHtml = `<button onclick="updateKitchenStatus(${order.rowIdx}, '${order.source}', 'รับออเดอร์แล้ว')" class="w-full bg-pink-600 text-white font-bold py-3.5 rounded-xl shadow-md text-base hover:bg-pink-700 transition active:scale-95 transform">📥 รับออเดอร์</button>`;
             }
-
-            let displayTable = order.tableNo || order.orderType || 'ทานที่ร้าน';
-            let queueText = order.queueNo && order.queueNo !== "-" ? order.queueNo : order.orderId.slice(-4);
 
             html += `
             <div class="rounded-[2rem] border-2 flex flex-col justify-between shadow-sm h-[420px] transition-all ${cardColor}">
                 <div class="p-5 flex flex-col overflow-hidden h-full">
                     <div class="flex justify-between items-start mb-3 border-b border-pink-100/50 pb-2">
                         <div>
-                            <div class="text-2xl font-black text-pink-800">#${queueText}</div>
-                            <div class="text-xs font-bold text-pink-600 mt-1">${order.timestamp}</div>
+                            <div class="text-2xl font-black text-pink-800">${order.queueNo}</div>
+                            <div class="text-xs font-bold text-pink-600 mt-1">${order.queueSubInfo || ''}</div>
                         </div>
-                        <div class="text-xs font-bold px-3 py-1.5 rounded-xl bg-white border border-pink-100 text-pink-700 shadow-sm flex items-center gap-1">🍽️ ${displayTable}</div>
+                        <div class="text-xs font-bold px-2 py-1 rounded-xl bg-white border border-pink-100 text-pink-700">${order.orderType}</div>
                     </div>
-                    <div class="flex-1 overflow-y-auto no-scrollbar">${itemsHtml}</div>
+                    <div class="flex-1 overflow-y-auto">${itemsHtml}</div>
                 </div>
                 <div class="p-4 border-t border-pink-100/60 bg-white/50 rounded-b-[2rem]">
                     ${actionButtonHtml}
@@ -332,7 +230,7 @@
         grid.innerHTML = html;
     }
 
-    function updateKitchenStatus(orderId, status) {
+    function updateKitchenStatus(rowIdx, source, status) {
         showToast("กำลังอัปเดตสถานะ...", "info");
         google.script.run
             .withSuccessHandler(function() {
@@ -342,29 +240,26 @@
             .withFailureHandler(function(err) {
                  Swal.fire('ข้อผิดพลาดระบบ', err || 'ไม่สามารถอัปเดตสถานะได้', 'error');
             })
-            .updateOrderStatusBackend(orderId, status); // 👈 เรียกฟังก์ชัน Backend
+            .updateKitchenStatusGS(rowIdx, source, status); // 👈 Proxy จะแอบยัด STORE_ID ให้เอง
     }
 
-    function serveOrder(orderId, tableNo) {
-        let order = activeOrdersList.find(o => o.orderId === orderId);
-
+    function serveOrder(rowIdx, queueNo, source = "Sales") {
+        let order = activeOrdersList.find(o => o.rowIdx == rowIdx && o.source == source);
         google.script.run
             .withSuccessHandler(function(res) {
-                // 🔊 เล่นเสียงกริ่ง
-                playSound('bellding.mp3'); 
-                
-                // 🎙️ ต่อด้วยเสียงพูด (ถ้าเจอข้อมูลออเดอร์)
-                if (order) {
-                    setTimeout(() => speakOrderReady(order), 1000); // ดีเลย์ 1 วิให้เสียงกริ่งจบก่อน
+                if (res === "Success") {
+                    playSound('bellding.mp3'); 
+                    if (order) setTimeout(() => speakOrderReady(order), 1000); 
+                    showToast(`เคลียร์คิว ${queueNo} เรียบร้อยแล้ว`, "success");
+                    fetchKitchenOrders();
+                } else {
+                    Swal.fire('ผิดพลาด', res, 'error');
                 }
-
-                showToast(`เคลียร์บิล ${orderId.slice(-4)} เรียบร้อยแล้ว`, "success");
-                fetchKitchenOrders();
             })
             .withFailureHandler(function(err) {
                 Swal.fire('ข้อผิดพลาดระบบ', 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้', 'error');
             })
-            .updateOrderStatusBackend(orderId, 'เสร็จสิ้น'); // 👈 สั่งให้ Backend ปรับเป็น "เสร็จสิ้น"
+            .completeKitchenOrderGS(rowIdx, source); // 👈 Proxy จะแอบยัด STORE_ID ให้เอง
     }
 
     function updateClock() {
@@ -379,20 +274,15 @@
     function showToast(message, type = "success") {
       const container = document.getElementById('toastContainer');
       if (!container) return; 
-      
       const toast = document.createElement('div');
       const bgColor = type === 'error' ? 'bg-red-500' : 'bg-pink-600';
-      
       toast.className = `flex items-center gap-3 ${bgColor} text-white px-6 py-4 rounded-2xl shadow-2xl transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto font-bold text-lg`;
       toast.innerHTML = `<span class="text-xl">${type === 'error' ? '❌' : '✅'}</span> <span>${message}</span>`;
-      
       container.appendChild(toast);
-      
       setTimeout(() => { 
         toast.classList.remove('translate-x-full', 'opacity-0'); 
         toast.classList.add('translate-x-0', 'opacity-100'); 
       }, 50);
-
       setTimeout(() => { 
         toast.classList.remove('translate-x-0', 'opacity-100'); 
         toast.classList.add('translate-x-full', 'opacity-0'); 
@@ -400,65 +290,46 @@
       }, 3000);
     }
 
-    // เริ่มทำงานครั้งแรก และตั้งเวลา Refresh
     fetchKitchenOrders();
-    setInterval(fetchKitchenOrders, 15000); // รีเฟรชทุกๆ 15 วินาที
+    setInterval(fetchKitchenOrders, 15000);
 
-    // ==========================================
-    // 🔊 ระบบฟังก์ชันเสียง สำหรับหน้าจอครัว
-    // ==========================================
     function speakThai(text) {
         if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
-        
         let msg = new SpeechSynthesisUtterance();
-        msg.text = text;
-        msg.lang = 'th-TH'; 
-        msg.rate = 0.8;      
-        msg.pitch = 1.1;    
-
+        msg.text = text; msg.lang = 'th-TH'; msg.rate = 0.8; msg.pitch = 1.1;    
         window.speechSynthesis.speak(msg);
     }
 
     function triggerAudioEvent(event, data = {}) {
-        let audioSettings = JSON.parse(localStorage.getItem('famepos_audio_settings')) || { 
-            orderReady: true, 
-            newOrder: true 
-        };
-
+        let audioSettings = JSON.parse(localStorage.getItem('famepos_audio_settings')) || { orderReady: true, newOrder: true };
         if (!audioSettings[event]) return; 
-
         switch (event) {
-            case 'newOrder':
-                speakThai("ออเดอร์ใหม่เข้ามาแล้วจ้า");
+            case 'newOrder': speakThai("ออเดอร์ใหม่เข้ามาแล้วจ้า"); break;
+            case 'orderReady':
+                let orderReadyText = "ออเดอร์พร้อมเสิร์ฟแล้วค่ะ";
+                if (data.type === 'ทานที่ร้าน' && data.table) orderReadyText = `ออเดอร์ โต๊ะที่ ${data.table} พร้อมเสิร์ฟแล้วค่ะ`;
+                else if (data.queue) orderReadyText = `ออเดอร์กลับบ้าน คิวที่ ${data.queue} พร้อมเสิร์ฟแล้วค่ะ`;
+                speakThai(orderReadyText);
                 break;
         }
     }
 
     function playSound(filename) {
-        // เปลี่ยนตรงนี้ ให้เป็นโฟลเดอร์/URL ไฟล์เสียงที่ใช้ได้จริง
-        const baseUrl = "https://famepos.github.io/kitchen/"; 
+        const baseUrl = "https://famepos.github.io/restaurant/"; 
         const audio = new Audio(baseUrl + filename);
-        audio.play().catch(e => console.warn("Audio blocked or file not found:", e));
+        audio.play().catch(e => console.warn("Audio blocked:", e));
     }
 
     function speakOrderReady(order) {
         let text = "";
-        let displayTable = order.tableNo || order.orderType || 'ทานที่ร้าน';
-        let queueText = order.queueNo && order.queueNo !== "-" ? order.queueNo : order.orderId.slice(-4);
-        
-        if (displayTable.includes("โต๊ะ")) {
-            text = `อาหารของ ${displayTable} พร้อมเสิร์ฟแล้วค่ะ`;
-        } 
-        else if (displayTable.includes("กลับบ้าน")) {
-            text = `ออเดอร์ กลับบ้าน คิวที่ ${queueText} อาหารพร้อมเสิร์ฟแล้วค่ะ`;
-        } 
+        if (order.orderType === "ทานที่ร้าน") text = `ออเดอร์ โต๊ะที่ ${order.tableNo} อาหารพร้อมเสิร์ฟแล้วค่ะ`;
+        else if (order.orderType === "กลับบ้าน") text = `ออเดอร์ กลับบ้าน คิวที่ ${order.queueNo} อาหารพร้อมเสิร์ฟแล้วค่ะ`;
         else { 
-            text = `ออเดอร์ ${displayTable} คิวที่ ${queueText} อาหารพร้อมเสิร์ฟแล้วค่ะ`;
+            let appName = order.deliveryApp || "เดลิเวอรี่";
+            let deliveryId = order.deliveryId || "";
+            text = `ออเดอร์ ${appName} ${deliveryId} อาหารพร้อมเสิร์ฟแล้วค่ะ`;
         }
-
         speakThai(text);
     }
   </script>
-</body>
-</html>
